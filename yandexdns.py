@@ -144,7 +144,7 @@ class YandexDNS(object):
         jsonDict = HttpTools.loadJsonFromRequest(request)
         return self.returnResult(self.isResponseSuccess(jsonDict))
 
-    def updateExternalIpv4(self):
+    def updateExternalIpv4(self, *ip):
         """
         Update record A (ipv4 address) to actual external ip
         External ip retreive using free internet services
@@ -154,23 +154,27 @@ class YandexDNS(object):
             return self.returnResult(False)
         # logger.debug('recA:%s' % recA)
         srvIp = recA['content']
+        newIp = srvIp
 
-        # get current external ip
-        myIp = HttpTools.getMyExternalIp()
-        if not myIp:
-            return self.returnResult(False)
-
-        if srvIp != myIp:
-            self.logger.info('Dns record of type \'A\': %s' % srvIp)
-            self.logger.info('My current external ip: %s' % myIp)
-            self.logger.info('Need update ip. %s <> %s' % (myIp, srvIp))
-            updateOk = self.updateRecord(record=recA, newParams={ 'content' : myIp })
-            if updateOk:
-                self.logger.info('External ip(record A) update to \'%s\' successfully', myIp)
-            else:
-                self.logger.error('Error when update external ip(record A) to \'%s\'', myIp)
+        if len(ip) > 0:
+            newIp = ip[0]
         else:
-            self.logger.info('External ip is actual. Domain: %s Ip: %s TTL: %d' % (self.domain, myIp, recA['ttl']))
+            # get current external ip
+            newIp = HttpTools.getMyExternalIp()
+            if not newIp:
+                return self.returnResult(False)
+
+        if srvIp != newIp:
+            self.logger.info('Dns record of type \'A\': %s' % srvIp)
+            self.logger.info('My current external ip: %s' % newIp)
+            self.logger.info('Need update ip. %s <> %s' % (newIp, srvIp))
+            updateOk = self.updateRecord(record=recA, newParams={ 'content' : newIp })
+            if updateOk:
+                self.logger.info('External ip(record A) update to \'%s\' successfully', newIp)
+            else:
+                self.logger.error('Error when update external ip(record A) to \'%s\'', newIp)
+        else:
+            self.logger.info('External ip is actual. Domain: %s Ip: %s TTL: %d' % (self.domain, newIp, recA['ttl']))
 
 
     @staticmethod
@@ -297,6 +301,8 @@ class Logger(object):
         return handler
 
 # -----------------------------------------------------
+import sys
+
 def main():
     logger = Logger.createLogger()
     try:
@@ -314,7 +320,10 @@ def main():
         # [logger.debug(yadns.printRecord(rec)) for rec in yadns.apiRecords]
 
         # update external ipv4
-        yadns.updateExternalIpv4()
+        if len(sys.argv) > 1:
+            yadns.updateExternalIpv4(sys.argv[1])
+        else:
+            yadns.updateExternalIpv4()
 
     except urllib2.URLError, e:
         logger.error('URLError = %s' % (str(e.reason)))
